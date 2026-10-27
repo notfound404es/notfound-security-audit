@@ -1,0 +1,534 @@
+{
+  "version": "1.0.0",
+  "notes": "Line-based heuristics. Every match is a SUSPECTED issue until the agent traces the data flow (see references/methodology.md). Fields: languages = extension groups defined in scripts/nfaudit/util.py; requires = regex that must appear somewhere in the file; unless = regex that, if present on the matched line, discards the match; unless_file = regex that, if present in the file, discards the match.",
+  "rules": [
+    {
+      "id": "js-eval",
+      "title": "Dynamic code evaluation (eval / new Function)",
+      "languages": ["js"],
+      "pattern": "\\beval\\s*\\(|\\bnew\\s+Function\\s*\\(",
+      "unless": "^\\s*(//|\\*)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-95", "owasp": "A05:2025",
+      "description": "Code built at runtime with eval or new Function executes with the full privileges of the process. If any part of the string can be influenced by a user, it becomes remote code execution.",
+      "recommendation": "Remove eval. Parse data with JSON.parse or use a lookup table of allowed operations.",
+      "remediation": ["Trace where the evaluated string comes from.", "Replace eval/new Function with JSON.parse, a switch over allowed values or a safe expression library.", "Add a Content-Security-Policy without 'unsafe-eval' in browsers."]
+    },
+    {
+      "id": "js-command-injection",
+      "title": "Shell command built from a template or concatenation",
+      "languages": ["js"],
+      "pattern": "\\b(?:exec|execSync)\\s*\\(\\s*(?:`[^`]*\\$\\{|[^)\\n]*?['\"]\\s*\\+\\s*[A-Za-z_])",
+      "requires": "child_process|shelljs|execa",
+      "severity": "high", "status": "suspected", "cwe": "CWE-78", "owasp": "A05:2025",
+      "description": "child_process.exec runs the string through a shell. Interpolating variables lets an attacker append extra commands with characters like ; | && or $().",
+      "recommendation": "Use execFile/spawn with an argument array and no shell, and validate inputs against an allow-list.",
+      "remediation": ["Switch to execFile(cmd, [arg1, arg2]) or spawn(cmd, args, { shell: false }).", "Validate every argument with an allow-list (e.g. /^[a-z0-9-]+$/).", "Never pass request data straight to a shell."]
+    },
+    {
+      "id": "js-spawn-shell",
+      "title": "Child process started with shell: true",
+      "languages": ["js"],
+      "pattern": "shell\\s*:\\s*true",
+      "requires": "child_process|execa",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-78", "owasp": "A05:2025",
+      "description": "With shell: true the arguments are interpreted by a shell, so metacharacters in user input become commands.",
+      "recommendation": "Remove shell: true and pass arguments as an array.",
+      "remediation": ["Set shell: false (the default) and pass arguments as an array.", "Validate inputs with an allow-list."]
+    },
+    {
+      "id": "js-sql-injection",
+      "title": "SQL query built with string interpolation",
+      "languages": ["js"],
+      "pattern": "(?:\\.(?:query|execute|raw|whereRaw|orderByRaw)|sql\\.unsafe|\\$(?:queryRawUnsafe|executeRawUnsafe))\\s*\\(\\s*(?:`[^`]*\\$\\{|['\"][^'\"]*['\"]\\s*\\+)",
+      "requires": "(?i)\\b(select|insert|update|delete)\\b",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "Interpolating values into SQL lets an attacker change the query: read other users' data, bypass logins or modify tables.",
+      "recommendation": "Use parameterized queries or the ORM query builder.",
+      "remediation": ["Use placeholders: db.query('SELECT * FROM users WHERE id = $1', [id]).", "With Prisma use $queryRaw`...${id}` (tagged template) instead of $queryRawUnsafe.", "Validate types (numbers, enums) before they reach the query."]
+    },
+    {
+      "id": "js-prisma-raw-unsafe",
+      "title": "Prisma $queryRawUnsafe / $executeRawUnsafe",
+      "languages": ["js"],
+      "pattern": "\\$(?:queryRawUnsafe|executeRawUnsafe)\\s*\\(",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "The Unsafe variants do not parameterize values. Any user input concatenated into them is SQL injection.",
+      "recommendation": "Use the tagged-template $queryRaw / $executeRaw, which parameterize automatically.",
+      "remediation": ["Replace with prisma.$queryRaw`SELECT ... WHERE id = ${id}`.", "If dynamic identifiers are needed, choose them from an allow-list with Prisma.sql / Prisma.raw."]
+    },
+    {
+      "id": "js-nosql-injection",
+      "title": "MongoDB query built directly from request data",
+      "languages": ["js"],
+      "pattern": "\\.(?:find|findOne|findOneAndUpdate|updateOne|updateMany|deleteOne|deleteMany|countDocuments)\\s*\\(\\s*req\\.(?:body|query|params)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-943", "owasp": "A05:2025",
+      "description": "Passing request objects as filters lets attackers send operators such as {\"$ne\": null} or {\"$gt\": \"\"} and bypass checks.",
+      "recommendation": "Build the filter from validated, typed fields and strip keys starting with $.",
+      "remediation": ["Pick fields explicitly: { email: String(req.body.email) }.", "Validate the body with a schema (zod, joi) or use mongo-sanitize / Mongoose sanitizeFilter."]
+    },
+    {
+      "id": "js-react-dangerous-html",
+      "title": "dangerouslySetInnerHTML without visible sanitization",
+      "languages": ["js"],
+      "pattern": "dangerouslySetInnerHTML\\s*=\\s*\\{\\{\\s*__html\\s*:",
+      "unless": "(?i)sanitiz|dompurify|purify",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "React escapes output by default; dangerouslySetInnerHTML turns that off. If the HTML contains user content, it is stored or reflected XSS.",
+      "recommendation": "Render text normally or sanitize the HTML with DOMPurify before injecting it.",
+      "remediation": ["Prefer rendering plain text or Markdown with a safe renderer.", "If HTML is required: DOMPurify.sanitize(html) on the server or client.", "Add a strict Content-Security-Policy."]
+    },
+    {
+      "id": "js-dom-xss-sink",
+      "title": "Assignment to innerHTML / outerHTML / document.write",
+      "languages": ["js"],
+      "pattern": "\\.(?:innerHTML|outerHTML)\\s*=(?!=)|\\binsertAdjacentHTML\\s*\\(|\\bdocument\\.write(?:ln)?\\s*\\(",
+      "unless": "(?i)sanitiz|dompurify|=\\s*['\"`]['\"`]|^\\s*(//|\\*)",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "These DOM sinks parse strings as HTML. Untrusted values here execute scripts in the victim's browser.",
+      "recommendation": "Use textContent / createElement, or sanitize with DOMPurify.",
+      "remediation": ["Replace el.innerHTML = value with el.textContent = value when no markup is needed.", "Sanitize unavoidable HTML with DOMPurify.", "Enable Trusted Types / CSP where possible."]
+    },
+    {
+      "id": "vue-v-html",
+      "title": "v-html / {@html} renders raw HTML",
+      "languages": ["js"],
+      "pattern": "\\bv-html\\s*=|\\{@html\\s",
+      "unless": "(?i)sanitiz|dompurify",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "v-html (Vue) and {@html} (Svelte) bypass template escaping. With user content this is XSS.",
+      "recommendation": "Use text interpolation or sanitize the HTML first.",
+      "remediation": ["Use {{ value }} / {value} for text.", "Sanitize HTML with DOMPurify before binding."]
+    },
+    {
+      "id": "js-ssrf",
+      "title": "Outgoing request to a URL taken from the request",
+      "languages": ["js"],
+      "pattern": "\\b(?:fetch|axios(?:\\.(?:get|post|put|patch|delete|request))?|got|needle|superagent\\.get|https?\\.(?:get|request))\\s*\\(\\s*(?:req(?:uest)?\\.(?:query|body|params)|searchParams\\.get\\(|`[^`]*\\$\\{\\s*req(?:uest)?\\.(?:query|body|params))",
+      "severity": "high", "status": "suspected", "cwe": "CWE-918", "owasp": "A01:2025",
+      "description": "If users choose the URL your server fetches, they can reach internal services, cloud metadata endpoints (169.254.169.254) or localhost admin panels.",
+      "recommendation": "Only fetch URLs from an allow-list of hosts and block private IP ranges after DNS resolution.",
+      "remediation": ["Parse the URL, require https and check the hostname against an allow-list.", "Resolve DNS and reject private, loopback and link-local addresses.", "Disable redirects or re-validate each redirect target."]
+    },
+    {
+      "id": "js-open-redirect",
+      "title": "Redirect to a user-supplied URL",
+      "languages": ["js"],
+      "pattern": "\\b(?:res\\.redirect|redirect|NextResponse\\.redirect)\\s*\\(\\s*(?:req(?:uest)?\\.(?:query|body|params)|searchParams\\.get\\()",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-601", "owasp": "A01:2025",
+      "description": "Unvalidated redirects are used in phishing: a link on your domain sends the victim to an attacker's site, and they can leak OAuth codes.",
+      "recommendation": "Only redirect to relative paths or to an allow-list of destinations.",
+      "remediation": ["Accept only paths starting with a single '/' (not '//').", "Map short keys to fixed URLs instead of accepting full URLs."]
+    },
+    {
+      "id": "js-path-traversal",
+      "title": "File system access with a path from the request",
+      "languages": ["js"],
+      "pattern": "\\b(?:readFile|readFileSync|createReadStream|writeFile|writeFileSync|unlink|unlinkSync|sendFile|download)\\s*\\([^)\\n]*req(?:uest)?\\.(?:query|body|params)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-22", "owasp": "A01:2025",
+      "description": "Paths like ../../.env let attackers read or overwrite files outside the intended folder.",
+      "recommendation": "Resolve the path, then check it stays inside the allowed base directory.",
+      "remediation": ["const p = path.resolve(BASE, name); if (!p.startsWith(BASE + path.sep)) reject.", "Prefer IDs mapped to files over raw file names."]
+    },
+    {
+      "id": "js-tls-verification-disabled",
+      "title": "TLS certificate verification disabled",
+      "languages": ["js"],
+      "pattern": "rejectUnauthorized\\s*:\\s*false|NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-295", "owasp": "A04:2025",
+      "description": "Without certificate validation, anyone on the network path can impersonate the remote server and read or alter the traffic.",
+      "recommendation": "Keep verification on; add the internal CA with the ca option if needed.",
+      "remediation": ["Remove rejectUnauthorized: false.", "For self-signed internal services, pin or add the CA certificate instead."]
+    },
+    {
+      "id": "js-jwt-insecure",
+      "title": "JWT accepted with the 'none' algorithm or without expiry checks",
+      "languages": ["js"],
+      "pattern": "algorithms\\s*:\\s*\\[[^\\]]*['\"]none['\"]|ignoreExpiration\\s*:\\s*true",
+      "severity": "high", "status": "suspected", "cwe": "CWE-347", "owasp": "A07:2025",
+      "description": "Accepting alg 'none' or ignoring expiration lets forged or stolen tokens authenticate.",
+      "recommendation": "Pin the expected algorithm and keep expiration checks.",
+      "remediation": ["jwt.verify(token, key, { algorithms: ['HS256'] }) (or your real algorithm).", "Never set ignoreExpiration: true in production."]
+    },
+    {
+      "id": "js-insecure-randomness",
+      "title": "Math.random() used for tokens or secrets",
+      "languages": ["js"],
+      "pattern": "Math\\.random\\s*\\(\\)",
+      "line_requires": "(?i)token|secret|password|passwd|otp|nonce|session|salt|apikey|api_key",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-338", "owasp": "A04:2025",
+      "description": "Math.random() is predictable. Tokens generated with it can be guessed.",
+      "recommendation": "Use crypto.randomBytes / crypto.randomUUID / crypto.getRandomValues.",
+      "remediation": ["Replace with crypto.randomBytes(32).toString('hex') or crypto.randomUUID()."]
+    },
+    {
+      "id": "js-weak-hash",
+      "title": "MD5 or SHA-1 hashing",
+      "languages": ["js"],
+      "pattern": "createHash\\s*\\(\\s*['\"](?:md5|sha1)['\"]",
+      "severity": "low", "status": "preventive", "cwe": "CWE-328", "owasp": "A04:2025",
+      "description": "MD5 and SHA-1 are broken for collision resistance and far too fast for passwords. Fine for non-security checksums, wrong for passwords or signatures.",
+      "recommendation": "Use SHA-256 for integrity and bcrypt/argon2/scrypt for passwords.",
+      "remediation": ["If this hashes passwords, migrate to argon2id or bcrypt.", "If it signs data, use HMAC-SHA-256."]
+    },
+    {
+      "id": "js-cookie-flags",
+      "title": "Cookie configured without httpOnly or secure",
+      "languages": ["js"],
+      "pattern": "httpOnly\\s*:\\s*false|\\bsecure\\s*:\\s*false",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-1004", "owasp": "A02:2025",
+      "description": "Session cookies without httpOnly can be stolen by any XSS; without secure they travel over plain HTTP.",
+      "recommendation": "Set httpOnly: true, secure: true and sameSite: 'lax' (or 'strict') for session cookies.",
+      "remediation": ["cookie: { httpOnly: true, secure: true, sameSite: 'lax' }.", "If secure:false is only for local development, gate it on NODE_ENV."]
+    },
+    {
+      "id": "js-cors-credentials-any-origin",
+      "title": "CORS reflects any origin while allowing credentials",
+      "languages": ["js"],
+      "pattern": "origin\\s*:\\s*(?:true|['\"]\\*['\"])",
+      "requires": "credentials\\s*:\\s*true",
+      "severity": "high", "status": "suspected", "cwe": "CWE-942", "owasp": "A02:2025",
+      "description": "Allowing every origin together with credentials lets any website make authenticated requests as your logged-in users and read the responses.",
+      "recommendation": "List the exact origins that may call the API.",
+      "remediation": ["cors({ origin: ['https://your-site.com'], credentials: true }).", "Never combine origin: true / '*' with credentials."]
+    },
+    {
+      "id": "js-unsafe-deserialization",
+      "title": "Unsafe deserialization library",
+      "languages": ["js"],
+      "pattern": "require\\(['\"]node-serialize['\"]\\)|from\\s+['\"]node-serialize['\"]|\\bunserialize\\s*\\(",
+      "severity": "high", "status": "suspected", "cwe": "CWE-502", "owasp": "A08:2025",
+      "description": "node-serialize evaluates functions embedded in the payload; deserializing attacker data executes code.",
+      "recommendation": "Use JSON.parse with schema validation.",
+      "remediation": ["Remove node-serialize.", "Validate parsed JSON with zod/joi."]
+    },
+    {
+      "id": "next-svg-optimization",
+      "title": "Next.js image optimization allows SVG",
+      "languages": ["js"],
+      "pattern": "dangerouslyAllowSVG\\s*:\\s*true",
+      "severity": "medium", "status": "preventive", "cwe": "CWE-79", "owasp": "A02:2025",
+      "description": "Serving user-controlled SVG through the image optimizer can lead to XSS, and SVG processing was the vector of CVE-2026-96889 (fixed in Next.js 15.5.28 / 16.4.1).",
+      "recommendation": "Disable dangerouslyAllowSVG unless you need it; if you do, set contentDispositionType: 'attachment' and a strict contentSecurityPolicy.",
+      "remediation": ["Remove dangerouslyAllowSVG or pair it with contentSecurityPolicy: \"default-src 'self'; script-src 'none'; sandbox;\".", "Keep Next.js and sharp updated."]
+    },
+    {
+      "id": "php-sql-injection",
+      "title": "SQL query built with PHP variables",
+      "languages": ["php"],
+      "pattern": "(?i)(?:mysqli_query|mysql_query|pg_query|->query|->exec|DB::(?:select|statement|unprepared|raw|insert|update|delete)|->(?:whereRaw|selectRaw|orderByRaw|havingRaw|groupByRaw))\\s*\\([^;]*(?:\\$_(?:GET|POST|REQUEST|COOKIE)|['\"]\\s*\\.\\s*\\$[A-Za-z_]|\"[^\"]*\\{?\\$[A-Za-z_])",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "Concatenating or interpolating variables into SQL lets attackers rewrite the query.",
+      "recommendation": "Use prepared statements (PDO/mysqli) or Eloquent/Query Builder bindings.",
+      "remediation": ["$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?'); $stmt->execute([$id]);", "In Laravel: DB::select('... where id = ?', [$id]) or ->whereRaw('id = ?', [$id]).", "Cast numeric inputs with (int)."]
+    },
+    {
+      "id": "php-command-injection",
+      "title": "Shell command executed with a PHP variable",
+      "languages": ["php"],
+      "pattern": "\\b(?:system|exec|shell_exec|passthru|popen|proc_open|pcntl_exec)\\s*\\([^;]*\\$",
+      "unless": "escapeshellarg",
+      "severity": "high", "status": "suspected", "cwe": "CWE-78", "owasp": "A05:2025",
+      "description": "Variables in shell commands let attackers inject additional commands and run them on your server.",
+      "recommendation": "Avoid the shell; if unavoidable, escape each argument with escapeshellarg and validate with an allow-list.",
+      "remediation": ["Use a PHP library instead of calling a binary when possible.", "Wrap every argument with escapeshellarg() and validate its format.", "In Laravel use Process::run([...]) with an argument array."]
+    },
+    {
+      "id": "php-code-evaluation",
+      "title": "eval / assert / create_function / preg_replace /e",
+      "languages": ["php"],
+      "pattern": "\\b(?:eval|assert|create_function)\\s*\\(\\s*\\$|preg_replace\\s*\\(\\s*['\"][^'\"]*/[a-zA-Z]*e[a-zA-Z]*['\"]",
+      "severity": "high", "status": "suspected", "cwe": "CWE-95", "owasp": "A05:2025",
+      "description": "Evaluating strings as PHP code is remote code execution if the string is attacker-influenced.",
+      "recommendation": "Remove dynamic evaluation; use explicit logic or preg_replace_callback.",
+      "remediation": ["Replace eval with a whitelist of operations.", "Use preg_replace_callback instead of the /e modifier."]
+    },
+    {
+      "id": "php-file-inclusion",
+      "title": "include/require with a request parameter",
+      "languages": ["php"],
+      "pattern": "\\b(?:include|include_once|require|require_once)\\b\\s*\\(?\\s*[^;]*\\$_(?:GET|POST|REQUEST|COOKIE)",
+      "severity": "critical", "status": "suspected", "cwe": "CWE-98", "owasp": "A05:2025",
+      "description": "Including a file chosen by the user allows reading local files and, with log poisoning or uploads, executing code.",
+      "recommendation": "Map allowed page names to fixed files.",
+      "remediation": ["$pages = ['home' => 'home.php']; include $pages[$_GET['p']] ?? 'home.php';", "Set allow_url_include=Off."]
+    },
+    {
+      "id": "php-reflected-xss",
+      "title": "Request data echoed without escaping",
+      "languages": ["php"],
+      "pattern": "\\b(?:echo|print|printf)\\b[^;]*\\$_(?:GET|POST|REQUEST|COOKIE|SERVER\\[['\"](?:PHP_SELF|REQUEST_URI|QUERY_STRING|HTTP_REFERER|HTTP_USER_AGENT))",
+      "unless": "htmlspecialchars|htmlentities|esc_html|esc_attr|e\\(|strip_tags|intval|\\(int\\)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "Printing request values straight into HTML lets attackers inject scripts through a crafted link.",
+      "recommendation": "Escape on output with htmlspecialchars($v, ENT_QUOTES, 'UTF-8') (or e() in Laravel, esc_html() in WordPress).",
+      "remediation": ["echo htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8');", "Use a template engine with auto-escaping (Blade {{ }}, Twig)."]
+    },
+    {
+      "id": "blade-unescaped-output",
+      "title": "Blade unescaped output {!! !!}",
+      "languages": ["blade"],
+      "pattern": "\\{!!\\s*(?!\\s*(?:csrf_field|method_field|\\$slot|\\$attributes))",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "{!! !!} prints raw HTML. With user-controlled content this is stored XSS.",
+      "recommendation": "Use {{ }} (escaped) or sanitize the HTML before printing.",
+      "remediation": ["Replace {!! $x !!} with {{ $x }}.", "If HTML is required, sanitize it with a purifier (e.g. mews/purifier)."]
+    },
+    {
+      "id": "php-unsafe-unserialize",
+      "title": "unserialize() on untrusted data",
+      "languages": ["php"],
+      "pattern": "\\bunserialize\\s*\\(\\s*(?:\\$_(?:GET|POST|REQUEST|COOKIE)|base64_decode\\s*\\(\\s*\\$|\\$(?:data|input|payload|request|cookie))",
+      "unless": "allowed_classes\\s*=>\\s*false",
+      "severity": "high", "status": "suspected", "cwe": "CWE-502", "owasp": "A08:2025",
+      "description": "unserialize on attacker data enables PHP object injection, which with framework gadget chains leads to code execution.",
+      "recommendation": "Use json_decode, or unserialize($x, ['allowed_classes' => false]).",
+      "remediation": ["Store structured data as JSON.", "If unserialize is unavoidable, pass ['allowed_classes' => false]."]
+    },
+    {
+      "id": "php-ssrf",
+      "title": "Server-side request to a URL from the request",
+      "languages": ["php"],
+      "pattern": "(?:curl_init\\s*\\(|CURLOPT_URL\\s*,|Http::(?:get|post|send)\\s*\\(|file_get_contents\\s*\\(\\s*['\"]?https?)[^;]*\\$_(?:GET|POST|REQUEST)|curl_init\\s*\\(\\s*\\$_(?:GET|POST|REQUEST)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-918", "owasp": "A01:2025",
+      "description": "Letting users choose the URL your server requests exposes internal services and cloud metadata.",
+      "recommendation": "Validate the URL against an allow-list of hosts and block private ranges.",
+      "remediation": ["parse_url() the input, require https and an allowed host.", "Resolve DNS and reject private/loopback IPs; disable redirects (CURLOPT_FOLLOWLOCATION false)."]
+    },
+    {
+      "id": "php-path-traversal",
+      "title": "File function with a path from the request",
+      "languages": ["php"],
+      "pattern": "\\b(?:file_get_contents|readfile|fopen|file|unlink|file_put_contents|copy|rename)\\s*\\([^;]*\\$_(?:GET|POST|REQUEST|COOKIE)",
+      "unless": "basename\\s*\\(",
+      "severity": "high", "status": "suspected", "cwe": "CWE-22", "owasp": "A01:2025",
+      "description": "User-controlled paths allow ../ traversal to read .env, config files or overwrite code.",
+      "recommendation": "Use basename() plus realpath() checks against a base directory, or map IDs to files.",
+      "remediation": ["$p = realpath(BASE.'/'.basename($name)); if (!$p || !str_starts_with($p, BASE)) abort.", "Serve downloads by database ID instead of file name."]
+    },
+    {
+      "id": "php-weak-password-hash",
+      "title": "Password hashed with md5/sha1",
+      "languages": ["php"],
+      "pattern": "(?i)\\b(?:md5|sha1|hash\\s*\\(\\s*['\"](?:md5|sha1|sha256)['\"]\\s*,)\\s*\\(?\\s*\\$[a-z_]*pass",
+      "severity": "high", "status": "suspected", "cwe": "CWE-916", "owasp": "A04:2025",
+      "description": "Fast hashes are cracked in seconds with GPUs once the database leaks.",
+      "recommendation": "Use password_hash() / password_verify() (bcrypt or argon2id).",
+      "remediation": ["$hash = password_hash($password, PASSWORD_DEFAULT);", "Rehash on next login with password_needs_rehash()."]
+    },
+    {
+      "id": "php-extract-request",
+      "title": "extract() on request data",
+      "languages": ["php"],
+      "pattern": "\\bextract\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE|FILES)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-621", "owasp": "A05:2025",
+      "description": "extract() turns request keys into local variables, letting attackers overwrite variables such as $is_admin.",
+      "recommendation": "Read the specific keys you need.",
+      "remediation": ["Replace extract($_POST) with explicit $name = $_POST['name'] ?? ''."]
+    },
+    {
+      "id": "laravel-mass-assignment",
+      "title": "Mass assignment wide open",
+      "languages": ["php"],
+      "pattern": "protected\\s+\\$guarded\\s*=\\s*\\[\\s*\\]|(?:::create|->fill|->update|::forceCreate)\\s*\\(\\s*\\$request->all\\s*\\(\\s*\\)",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-915", "owasp": "A01:2025",
+      "description": "With $guarded = [] or $request->all(), users can set columns you did not intend, like is_admin or user_id.",
+      "recommendation": "Use $fillable and $request->validated() / $request->only([...]).",
+      "remediation": ["Define protected $fillable = ['name', 'email'];", "Model::create($request->validated());"]
+    },
+    {
+      "id": "py-sql-injection",
+      "title": "SQL built with f-strings, % or + in Python",
+      "languages": ["py"],
+      "pattern": "\\.(?:execute|executemany|raw|extra)\\s*\\(\\s*(?:f['\"]|['\"][^'\"]*['\"]\\s*(?:%|\\+|\\.format))|\\btext\\s*\\(\\s*f['\"]",
+      "requires": "(?i)\\b(select|insert|update|delete)\\b",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "Formatting values into SQL strings allows injection; the driver cannot tell data from code.",
+      "recommendation": "Pass parameters separately: cursor.execute('... WHERE id = %s', (id,)).",
+      "remediation": ["Use driver placeholders (%s, ?, :name) with a parameters tuple/dict.", "In Django use the ORM or params= in raw().", "In SQLAlchemy use text('... :id').bindparams(id=id)."]
+    },
+    {
+      "id": "py-command-injection",
+      "title": "os.system / os.popen / subprocess with shell=True",
+      "languages": ["py"],
+      "pattern": "\\bos\\.(?:system|popen)\\s*\\(\\s*(?!['\"][^'\"]*['\"]\\s*\\))|\\bsubprocess\\.(?:call|run|Popen|check_output|check_call|getoutput|getstatusoutput)\\s*\\([^)]*shell\\s*=\\s*True",
+      "severity": "high", "status": "suspected", "cwe": "CWE-78", "owasp": "A05:2025",
+      "description": "Commands run through a shell interpret metacharacters, so variables become injectable commands.",
+      "recommendation": "Use subprocess.run([...], shell=False) with an argument list and validate inputs.",
+      "remediation": ["subprocess.run(['convert', src, dst], check=True)", "Use shlex.quote only as a last resort."]
+    },
+    {
+      "id": "py-code-evaluation",
+      "title": "eval / exec on non-literal input",
+      "languages": ["py"],
+      "pattern": "(?<![\\w.])(?:eval|exec)\\s*\\(\\s*(?!['\"])",
+      "unless": "^\\s*#|ast\\.literal_eval",
+      "severity": "high", "status": "suspected", "cwe": "CWE-95", "owasp": "A05:2025",
+      "description": "eval/exec run arbitrary Python. With user input this is remote code execution.",
+      "recommendation": "Use ast.literal_eval for literals or explicit parsing.",
+      "remediation": ["Replace eval(x) with ast.literal_eval(x) or json.loads(x)."]
+    },
+    {
+      "id": "py-unsafe-deserialization",
+      "title": "pickle / marshal / unsafe YAML loading",
+      "languages": ["py"],
+      "pattern": "\\b(?:pickle|cPickle|dill|marshal|shelve)\\.loads?\\s*\\(|\\byaml\\.unsafe_load\\s*\\(|\\byaml\\.load\\s*\\((?![^)]*Loader\\s*=\\s*(?:yaml\\.)?C?SafeLoader)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-502", "owasp": "A08:2025",
+      "description": "pickle and unsafe YAML execute code while loading. Never load them from users, cookies, caches shared with users or uploaded files.",
+      "recommendation": "Use JSON, or yaml.safe_load.",
+      "remediation": ["Replace yaml.load(x) with yaml.safe_load(x).", "Replace pickle with json for data that crosses a trust boundary; sign it with HMAC if it must round-trip."]
+    },
+    {
+      "id": "py-ssrf",
+      "title": "HTTP request to a URL from the request (Python)",
+      "languages": ["py"],
+      "pattern": "\\b(?:requests|httpx|urllib\\.request|urllib3)\\.(?:get|post|put|request|head|urlopen)\\s*\\(\\s*(?:request\\.(?:args|GET|POST|form|json|query_params|values)|f['\"][^'\"]*\\{\\s*request\\.)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-918", "owasp": "A01:2025",
+      "description": "User-chosen URLs let attackers make your server call internal services or cloud metadata.",
+      "recommendation": "Validate scheme and host against an allow-list and block private IP ranges.",
+      "remediation": ["urlparse() the input and check hostname in ALLOWED_HOSTS.", "Resolve and reject private/loopback addresses; disable redirects."]
+    },
+    {
+      "id": "py-tls-verification-disabled",
+      "title": "TLS verification disabled (verify=False)",
+      "languages": ["py"],
+      "pattern": "\\bverify\\s*=\\s*False\\b|_create_unverified_context\\s*\\(",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-295", "owasp": "A04:2025",
+      "description": "Disabling certificate checks allows man-in-the-middle attacks.",
+      "recommendation": "Remove verify=False; point verify= to a CA bundle for internal services.",
+      "remediation": ["requests.get(url) (default verify=True) or verify='/path/ca.pem'."]
+    },
+    {
+      "id": "py-flask-debug",
+      "title": "Flask/Werkzeug debug mode enabled in code",
+      "languages": ["py"],
+      "pattern": "\\.run\\s*\\([^)]*debug\\s*=\\s*True|app\\.debug\\s*=\\s*True",
+      "severity": "high", "status": "suspected", "cwe": "CWE-489", "owasp": "A02:2025",
+      "description": "The Werkzeug debugger allows executing Python from the browser if it is reachable in production.",
+      "recommendation": "Drive debug from an environment variable that is off in production.",
+      "remediation": ["app.run(debug=os.environ.get('FLASK_DEBUG') == '1')", "Serve production with gunicorn/uwsgi, never app.run."]
+    },
+    {
+      "id": "django-csrf-exempt",
+      "title": "@csrf_exempt view",
+      "languages": ["py"],
+      "pattern": "@csrf_exempt\\b",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-352", "owasp": "A01:2025",
+      "description": "Exempted views accept cross-site POSTs. Acceptable for signed webhooks, dangerous for session-authenticated actions.",
+      "recommendation": "Keep CSRF protection unless the endpoint authenticates each request in another way (signature, token).",
+      "remediation": ["Remove @csrf_exempt, or verify a webhook signature inside the view."]
+    },
+    {
+      "id": "py-template-unescaped",
+      "title": "Autoescape disabled / mark_safe / |safe",
+      "languages": ["py", "pytpl"],
+      "pattern": "\\bmark_safe\\s*\\(|\\|\\s*safe\\b|autoescape\\s*=\\s*False|\\{%\\s*autoescape\\s+off",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "Marking content as safe disables HTML escaping. With user data this is XSS.",
+      "recommendation": "Keep autoescape on and sanitize HTML (e.g. with nh3/bleach) before marking it safe.",
+      "remediation": ["Remove |safe / mark_safe for user content.", "Sanitize allowed HTML with nh3.clean()."]
+    },
+    {
+      "id": "py-insecure-randomness",
+      "title": "random module used for secrets",
+      "languages": ["py"],
+      "pattern": "\\brandom\\.(?:random|randint|choice|choices|randrange|getrandbits)\\s*\\(",
+      "line_requires": "(?i)token|secret|password|passwd|otp|nonce|session|salt|key",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-338", "owasp": "A04:2025",
+      "description": "The random module is not cryptographically secure.",
+      "recommendation": "Use the secrets module.",
+      "remediation": ["secrets.token_urlsafe(32) / secrets.choice(...)"]
+    },
+    {
+      "id": "java-sql-injection",
+      "title": "JDBC/JPA query built with concatenation",
+      "languages": ["java"],
+      "pattern": "\\.(?:executeQuery|executeUpdate|execute|prepareStatement|createQuery|createNativeQuery|queryForList|queryForObject|update)\\s*\\(\\s*(?:\"[^\"]*\"\\s*\\+|[A-Za-z_][\\w.]*\\s*\\+\\s*\")",
+      "requires": "(?i)\\b(select|insert|update|delete)\\b",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "String concatenation in SQL/JPQL allows injection.",
+      "recommendation": "Use PreparedStatement placeholders or named parameters.",
+      "remediation": ["ps = conn.prepareStatement(\"SELECT * FROM users WHERE id = ?\"); ps.setLong(1, id);", "In JPA: query.setParameter(\"id\", id)."]
+    },
+    {
+      "id": "java-command-injection",
+      "title": "Runtime.exec / ProcessBuilder with concatenated input",
+      "languages": ["java"],
+      "pattern": "Runtime\\.getRuntime\\(\\)\\.exec\\s*\\([^;]*\\+|new\\s+ProcessBuilder\\s*\\([^;]*\\+|ProcessBuilder\\s*\\(\\s*\"(?:sh|bash|cmd(?:\\.exe)?)\"\\s*,\\s*\"[-/]c\"",
+      "severity": "high", "status": "suspected", "cwe": "CWE-78", "owasp": "A05:2025",
+      "description": "Concatenated command strings or sh -c allow attackers to inject extra commands.",
+      "recommendation": "Pass a fixed executable and separate, validated arguments.",
+      "remediation": ["new ProcessBuilder(\"convert\", src, dst) without sh -c.", "Validate arguments with an allow-list."]
+    },
+    {
+      "id": "java-unsafe-deserialization",
+      "title": "Java native or polymorphic deserialization",
+      "languages": ["java"],
+      "pattern": "new\\s+ObjectInputStream\\s*\\(|new\\s+XMLDecoder\\s*\\(|enableDefaultTyping\\s*\\(|activateDefaultTyping\\s*\\(|new\\s+XStream\\s*\\(",
+      "severity": "high", "status": "suspected", "cwe": "CWE-502", "owasp": "A08:2025",
+      "description": "Deserializing untrusted bytes with gadget-rich classpaths leads to remote code execution.",
+      "recommendation": "Use JSON with explicit types, or an ObjectInputFilter allow-list.",
+      "remediation": ["Replace native serialization with JSON DTOs.", "If unavoidable, set ObjectInputFilter.Config.createFilter(\"com.example.*;!*\")."]
+    },
+    {
+      "id": "java-xxe",
+      "title": "XML parser without XXE protection",
+      "languages": ["java"],
+      "pattern": "(?:DocumentBuilderFactory|SAXParserFactory|XMLInputFactory)\\.newInstance\\s*\\(",
+      "unless_file": "disallow-doctype-decl|FEATURE_SECURE_PROCESSING|SUPPORT_DTD|external-general-entities",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-611", "owasp": "A02:2025",
+      "description": "Default XML parsers resolve external entities, allowing file disclosure and SSRF through crafted XML.",
+      "recommendation": "Disable DOCTYPE declarations / external entities on the factory.",
+      "remediation": ["dbf.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);"]
+    },
+    {
+      "id": "spring-csrf-disabled",
+      "title": "Spring Security CSRF disabled",
+      "languages": ["java"],
+      "pattern": "csrf\\s*\\(\\s*\\)\\s*\\.\\s*disable\\s*\\(|csrf\\s*\\(\\s*(?:AbstractHttpConfigurer::disable|\\w+\\s*->\\s*\\w+\\.disable\\(\\))",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-352", "owasp": "A01:2025",
+      "description": "Disabling CSRF is fine for stateless token APIs but dangerous for cookie-session applications.",
+      "recommendation": "Keep CSRF enabled for any endpoint authenticated by cookies.",
+      "remediation": ["Remove .csrf().disable() or scope it to stateless API paths only."]
+    },
+    {
+      "id": "go-sql-injection",
+      "title": "Go SQL built with fmt.Sprintf or +",
+      "languages": ["go"],
+      "pattern": "\\.(?:Query|QueryRow|Exec|QueryContext|QueryRowContext|ExecContext)\\s*\\(\\s*(?:ctx\\s*,\\s*)?(?:fmt\\.Sprintf\\s*\\(|\"[^\"]*\"\\s*\\+)",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "Formatting values into SQL allows injection.",
+      "recommendation": "Use placeholders ($1 / ?) with arguments.",
+      "remediation": ["db.Query(\"SELECT * FROM users WHERE id = $1\", id)"]
+    },
+    {
+      "id": "go-tls-insecure",
+      "title": "InsecureSkipVerify: true",
+      "languages": ["go"],
+      "pattern": "InsecureSkipVerify\\s*:\\s*true",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-295", "owasp": "A04:2025",
+      "description": "Skipping certificate verification enables man-in-the-middle attacks.",
+      "recommendation": "Remove it and configure RootCAs for internal certificates.",
+      "remediation": ["tls.Config{RootCAs: pool}"]
+    },
+    {
+      "id": "rails-sql-injection",
+      "title": "ActiveRecord query with string interpolation",
+      "languages": ["rb"],
+      "pattern": "\\.(?:where|order|find_by_sql|joins|group|having|pluck|select|exists\\?)\\s*\\(\\s*\"[^\"]*#\\{",
+      "severity": "high", "status": "suspected", "cwe": "CWE-89", "owasp": "A05:2025",
+      "description": "Interpolating into ActiveRecord SQL fragments allows injection.",
+      "recommendation": "Use hash conditions or placeholders: where('id = ?', id).",
+      "remediation": ["User.where(id: params[:id])", "User.where('name = ?', params[:name])"]
+    },
+    {
+      "id": "rails-html-safe",
+      "title": "html_safe / raw on possibly user content",
+      "languages": ["rb"],
+      "pattern": "\\.html_safe\\b|\\braw\\s*\\(?\\s*@?[a-z_]",
+      "severity": "medium", "status": "suspected", "cwe": "CWE-79", "owasp": "A05:2025",
+      "description": "html_safe and raw disable Rails escaping.",
+      "recommendation": "Use sanitize() with an allow-list or plain output.",
+      "remediation": ["<%= sanitize @post.body, tags: %w(p a strong em) %>"]
+    }
+  ]
+}

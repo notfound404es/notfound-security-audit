@@ -1,0 +1,29 @@
+# Example: run NotFound Security Audit on every push and upload the results to GitHub code scanning.
+# Copy to .github/workflows/security-audit.yml in your project.
+name: security-audit
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get the scanner
+        run: git clone --depth 1 https://github.com/notfound404es/notfound-security-audit "$RUNNER_TEMP/nfaudit"
+      - name: Scan (read-only, offline + OSV.dev)
+        run: |
+          python "$RUNNER_TEMP/nfaudit/skills/notfound-security-audit/scripts/nfaudit.py" scan . \
+            --osv --format sarif,md --out "$RUNNER_TEMP/report" --fail-on critical
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ runner.temp }}/report/nfaudit-report.sarif

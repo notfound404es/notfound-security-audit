@@ -1,0 +1,50 @@
+{
+  "updated": "2026-10-27",
+  "notes": "Small, curated offline list of high-impact advisories for runtimes and frameworks. It is NOT a vulnerability database: run with --osv (OSV.dev) or osv-scanner for full coverage. Each entry: affected branches as [introduced, fixed) pairs; a third element \"eol\" marks end-of-life lines where the upper bound is the first supported release, not a fix.",
+  "runtimes": [
+    {
+      "id": "PHP2SHELL-2026-10",
+      "runtime": "php",
+      "title": "PHP core remote code execution (PHP2Shell)",
+      "aliases": ["CVE-2026-109618", "CVE-2026-109619"],
+      "severity": "critical",
+      "published": "2026-10-21",
+      "summary": "Memory-handling flaws in the PHP runtime. On Apache with mod_php an unauthenticated request could trigger code execution before application code ran; PHP-FPM was also confirmed exploitable through application code paths. Fixing application code or plugins does not fix it: the PHP binary must be updated.",
+      "affected": [["8.5.0", "8.5.12"], ["8.4.0", "8.4.27"], ["8.3.0", "8.3.36"], ["8.2.0", "8.2.35"], ["7.0.0", "8.2.0", "eol"]],
+      "remediation": ["Upgrade PHP to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or a distro package that backports the fix).", "Rebuild and redeploy Docker images (docker build --pull).", "PHP 8.1 and older have no regular upstream fix: plan the upgrade.", "A WAF rule is defense in depth, not a fix."],
+      "references": ["https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/", "https://blog.cloudflare.com/php-vulnerabilities-waf-protection/"]
+    },
+    {
+      "id": "NODE-2026-10-21",
+      "runtime": "node",
+      "title": "Node.js October 2026 security releases (10 CVEs, 4 high)",
+      "aliases": ["CVE-2026-111497", "CVE-2026-105482", "CVE-2026-105483", "CVE-2026-106069"],
+      "severity": "high",
+      "published": "2026-10-21",
+      "summary": "Includes a Brotli decoder out-of-bounds write that can lead to crash, memory disclosure or remote code execution when an application decompresses untrusted Brotli data with node:zlib, plus TLS hostname-verification and DNS issues.",
+      "affected": [["26.0.0", "26.12.1"], ["24.0.0", "24.22.1"], ["22.0.0", "22.23.4"]],
+      "remediation": ["Upgrade Node.js to 26.12.1, 24.22.1 or 22.23.4.", "Rebuild single executable applications and startup snapshots (CVE-2026-106074).", "Node.js 20 and older are end-of-life and receive no fix."],
+      "references": ["https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"]
+    }
+  ],
+  "packages": [
+    {
+      "id": "NEXTJS-2026-10-14",
+      "ecosystem": "npm",
+      "package": "next",
+      "title": "Next.js unauthenticated RCE (use cache typed arrays, Image Optimization SVG) and Server Actions DoS",
+      "aliases": ["GHSA-673q-mjm6-r5xr", "CVE-2026-96889", "GHSA-2464-fhr4-w9xw", "GHSA-p3m5-59mp-jv5r"],
+      "severity": "critical",
+      "published": "2026-10-14",
+      "summary": "Two critical unauthenticated remote code execution issues (App Router 'use cache' functions returning typed arrays; Image Optimization API with SVG on glibc Linux) and a high-severity Server Actions denial of service.",
+      "affected": [["10.0.0", "15.5.28"], ["16.0.0", "16.4.1"]],
+      "remediation": ["npm install next@16.4.1 (16.x) or next@15.5.28 (15.x).", "Make sure the resolved sharp version is 0.35.5 or later.", "Redeploy after upgrading."],
+      "references": ["https://nextjs.org/blog/nextjs-security-update-october-14-2026"]
+    }
+  ],
+  "eol": [
+    {"runtime": "node", "below_major": 22, "note": "Node.js 20 and older are end-of-life and receive no security fixes."},
+    {"runtime": "php", "below": "8.2.0", "note": "PHP 8.1 and older receive no regular upstream security fixes."},
+    {"runtime": "python", "below": "3.10.0", "note": "Python 3.9 and older are end-of-life."}
+  ]
+}

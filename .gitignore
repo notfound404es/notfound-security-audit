@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.nfaudit/
+nfaudit-report.*
+!examples/reports/nfaudit-report.*
+.DS_Store
+Thumbs.db

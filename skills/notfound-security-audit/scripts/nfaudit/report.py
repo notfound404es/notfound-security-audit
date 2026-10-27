@@ -1,0 +1,157 @@
+"""Report writers: JSON (machine), Markdown (human) and SARIF 2.1.0 (code-scanning tools)."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from . import __version__
+from .util import SEVERITIES, SEVERITY_RANK
+
+STATUS_LABEL = {
+    "confirmed": "Confirmed",
+    "suspected": "Needs review",
+    "preventive": "Preventive",
+}
+STATUS_HELP = {
+    "confirmed": "Backed by an advisory database, an exact version match or an unambiguous configuration value.",
+    "suspected": "A risky pattern. Trace the data flow before calling it a vulnerability; many will be false positives.",
+    "preventive": "Hardening advice. Not a vulnerability on its own.",
+}
+SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}
+
+
+def sort_key(f: dict):
+    return (["confirmed", "suspected", "preventive"].index(f["status"]), SEVERITY_RANK[f["severity"]], f["file"], f["line"])
+
+
+def summary(findings: list[dict]) -> dict:
+    out = {"total": len(findings), "by_status": {}, "by_severity": {s: 0 for s in SEVERITIES}}
+    for f in findings:
+        out["by_status"][f["status"]] = out["by_status"].get(f["status"], 0) + 1
+        out["by_severity"][f["severity"]] += 1
+    return out
+
+
+def to_json(result: dict) -> str:
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+def _md_escape(s: str) -> str:
+    return (s or "").replace("|", "\\|").replace("\n", " ")
+
+
+def to_markdown(result: dict) -> str:
+    findings = sorted(result["findings"], key=sort_key)
+    s = result["summary"]
+    st = result.get("stack", {})
+    lines = [
+        "# NotFound Security Audit report",
+        "",
+        f"- **Target:** `{result['target']}`",
+        f"- **Date:** {result['generated_at']}",
+        f"- **Scanner:** nfaudit {result['version']} (read-only)",
+        f"- **Checks run:** {', '.join(result['checks'])}",
+        f"- **Stack:** {', '.join(st.get('frameworks') or []) or 'n/a'} · languages: {', '.join(st.get('languages') or []) or 'n/a'}"
+        + (f" · platforms: {', '.join(st['platforms'])}" if st.get("platforms") else ""),
+        f"- **Files scanned:** {result.get('files_scanned', 0)} · dependencies parsed: {result.get('dependency_count', 0)}",
+        "",
+        "## Summary",
+        "",
+        "| Status | Count |",
+        "|---|---|",
+    ]
+    for status in ("confirmed", "suspected", "preventive"):
+        lines.append(f"| {STATUS_LABEL[status]} | {s['by_status'].get(status, 0)} |")
+    lines += ["", "| Severity | Count |", "|---|---|"]
+    lines += [f"| {sev} | {s['by_severity'][sev]} |" for sev in SEVERITIES]
+    lines += ["", "> " + " ".join(f"**{STATUS_LABEL[k]}:** {v}" for k, v in STATUS_HELP.items()), ""]
+    if result.get("notes"):
+        lines += ["## Coverage notes", ""] + [f"- {n}" for n in result["notes"]] + [""]
+    if not findings:
+        lines += ["## Findings", "", "No findings from the automated checks. This does not mean the project is secure: "
+                  "authentication, authorisation and business logic still need a manual review (see references/methodology.md).", ""]
+    for status in ("confirmed", "suspected", "preventive"):
+        group = [f for f in findings if f["status"] == status]
+        if not group:
+            continue
+        lines += [f"## {STATUS_LABEL[status]} ({len(group)})", ""]
+        for i, f in enumerate(group, 1):
+            loc = f"`{f['file']}:{f['line']}`" if f["line"] else (f"`{f['file']}`" if f["file"] else "project-wide")
+            lines += [f"### {i}. [{f['severity'].upper()}] {f['title']}", "",
+                      f"- **Where:** {loc}",
+                      f"- **Rule:** `{f['rule_id']}`" + (f" · {f['cwe']}" if f["cwe"] else "") + (f" · OWASP {f['owasp']}" if f["owasp"] else "")
+                      + f" · fingerprint `{f['fingerprint']}`"]
+            if f["evidence"]:
+                lines += [f"- **Evidence:** `{_md_escape(f['evidence'])[:300]}`"]
+            lines += ["", f["description"], "", f"**Recommendation:** {f['recommendation']}"]
+            if f.get("remediation"):
+                lines += [""] + [f"{n}. {step}" for n, step in enumerate(f["remediation"], 1)]
+            if f.get("references"):
+                lines += ["", "References: " + " · ".join(f["references"][:4])]
+            lines += [""]
+    eps = result.get("entry_points") or []
+    if eps:
+        lines += [f"## Attack surface ({len(eps)} entry points)", "",
+                  "Inputs an attacker can reach. Review authentication and authorisation on each one manually.", "",
+                  "| Kind | Location |", "|---|---|"]
+        lines += [f"| {e['kind']} | `{e['file']}:{e['line']}` |" for e in eps[:60]]
+        if len(eps) > 60:
+            lines += [f"| … | {len(eps) - 60} more in the JSON report |"]
+        lines += [""]
+    if result.get("errors"):
+        lines += ["## Errors", ""] + [f"- {e}" for e in result["errors"]] + [""]
+    lines += ["---", "Generated by NotFound Security Audit. Automated checks find known patterns and known vulnerable versions; "
+              "they do not prove a project is safe or that a finding is exploitable."]
+    return "\n".join(lines) + "\n"
+
+
+def to_sarif(result: dict) -> str:
+    rules: dict[str, dict] = {}
+    results = []
+    for f in result["findings"]:
+        if f["rule_id"] not in rules:
+            rules[f["rule_id"]] = {
+                "id": f["rule_id"],
+                "name": f["rule_id"],
+                "shortDescription": {"text": f["title"][:200]},
+                "fullDescription": {"text": f["description"][:1000]},
+                "help": {"text": f["recommendation"]},
+                "properties": {"tags": ["security", f["category"]] + ([f["cwe"]] if f["cwe"] else []),
+                               "security-severity": {"critical": "9.5", "high": "8.0", "medium": "5.5", "low": "3.0", "info": "1.0"}[f["severity"]]},
+            }
+        res = {
+            "ruleId": f["rule_id"],
+            "level": SARIF_LEVEL[f["severity"]] if f["status"] != "preventive" else "note",
+            "message": {"text": f"[{STATUS_LABEL[f['status']]}] {f['title']}. {f['recommendation']}"},
+            "partialFingerprints": {"nfaudit/v1": f["fingerprint"]},
+            "properties": {"status": f["status"], "severity": f["severity"]},
+        }
+        if f["file"] and not f["file"].startswith("http"):
+            loc = {"physicalLocation": {"artifactLocation": {"uri": f["file"]}}}
+            if f["line"]:
+                loc["physicalLocation"]["region"] = {"startLine": f["line"]}
+            res["locations"] = [loc]
+        results.append(res)
+    sarif = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "NotFound Security Audit", "version": __version__,
+                                "informationUri": "https://github.com/notfound404es/notfound-security-audit",
+                                "rules": list(rules.values())}},
+            "results": results,
+        }],
+    }
+    return json.dumps(sarif, indent=2, ensure_ascii=False)
+
+
+def write_all(result: dict, out_dir: Path, formats: list[str]) -> dict[str, Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = {}
+    writers = {"json": ("nfaudit-report.json", to_json), "md": ("nfaudit-report.md", to_markdown), "sarif": ("nfaudit-report.sarif", to_sarif)}
+    for fmt in formats:
+        name, fn = writers[fmt]
+        path = out_dir / name
+        path.write_text(fn(result), encoding="utf-8")
+        written[fmt] = path
+    return written

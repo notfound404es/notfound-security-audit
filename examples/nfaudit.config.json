@@ -1,0 +1,6 @@
+{
+  "exclude": ["legacy/**", "scripts/one-off"],
+  "disable_rules": ["js-weak-hash"],
+  "ignore": [],
+  "include_tests": true
+}
