@@ -1,0 +1,80 @@
+{
+  "tool": "notfound-security-audit",
+  "version": "0.1.0",
+  "generated_at": "2026-10-27 16:10 UTC",
+  "target": "demo-clean-app",
+  "checks": [
+    "stack",
+    "secrets",
+    "code-patterns",
+    "config",
+    "docker",
+    "ci",
+    "runtimes",
+    "dependencies-offline"
+  ],
+  "stack": {
+    "languages": [
+      "js"
+    ],
+    "file_counts": {
+      "js": 3
+    },
+    "frameworks": [
+      "Next.js",
+      "React"
+    ],
+    "platforms": [
+      "Docker"
+    ],
+    "manifests": [
+      "package.json"
+    ]
+  },
+  "files_scanned": 7,
+  "dependency_count": 2,
+  "lockfiles": [
+    "package-lock.json"
+  ],
+  "runtimes": [
+    {
+      "runtime": "node",
+      "version": "24.22.1",
+      "exact": true,
+      "file": ".nvmrc",
+      "line": 1
+    },
+    {
+      "runtime": "node",
+      "version": "24.22.1",
+      "exact": true,
+      "file": "Dockerfile",
+      "line": 1
+    }
+  ],
+  "summary": {
+    "total": 0,
+    "by_status": {},
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0
+    }
+  },
+  "findings": [],
+  "entry_points": [
+    {
+      "kind": "Next.js route handler",
+      "file": "app/api/hello/route.ts",
+      "line": 1,
+      "match": "export async function GET() { return Response.json({ hi: process.env.GREETING }) }"
+    }
+  ],
+  "notes": [
+    "Dependencies were only checked against the small built-in advisory list. Run with --osv (sends package names and versions to OSV.dev, never code) for full CVE coverage."
+  ],
+  "errors": [],
+  "ignored_count": 0
+}

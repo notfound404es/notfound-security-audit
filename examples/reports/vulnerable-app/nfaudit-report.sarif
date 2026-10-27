@@ -1,0 +1,836 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "NotFound Security Audit",
+          "version": "0.1.0",
+          "informationUri": "https://github.com/notfound404es/notfound-security-audit",
+          "rules": [
+            {
+              "id": "runtime-php2shell-2026-10",
+              "name": "runtime-php2shell-2026-10",
+              "shortDescription": {
+                "text": "PHP core remote code execution (PHP2Shell)"
+              },
+              "fullDescription": {
+                "text": "Memory-handling flaws in the PHP runtime. On Apache with mod_php an unauthenticated request could trigger code execution before application code ran; PHP-FPM was also confirmed exploitable through application code paths. Fixing application code or plugins does not fix it: the PHP binary must be updated."
+              },
+              "help": {
+                "text": "Upgrade PHP to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or a distro package that backports the fix)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "runtime"
+                ],
+                "security-severity": "9.5"
+              }
+            },
+            {
+              "id": "firebase-open-rules",
+              "name": "firebase-open-rules",
+              "shortDescription": {
+                "text": "Firebase rules allow public access"
+              },
+              "fullDescription": {
+                "text": "Anyone with your public Firebase config can read or write this data."
+              },
+              "help": {
+                "text": "Require request.auth and check ownership in the rules."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "external-services",
+                  "CWE-284"
+                ],
+                "security-severity": "9.5"
+              }
+            },
+            {
+              "id": "dep-nextjs-2026-10-14",
+              "name": "dep-nextjs-2026-10-14",
+              "shortDescription": {
+                "text": "next 16.3.0: Next.js unauthenticated RCE (use cache typed arrays, Image Optimization SVG) and Server Actions DoS"
+              },
+              "fullDescription": {
+                "text": "Two critical unauthenticated remote code execution issues (App Router 'use cache' functions returning typed arrays; Image Optimization API with SVG on glibc Linux) and a high-severity Server Actions denial of service."
+              },
+              "help": {
+                "text": "npm install next@16.4.1 (16.x) or next@15.5.28 (15.x)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "dependency",
+                  "CWE-1395"
+                ],
+                "security-severity": "9.5"
+              }
+            },
+            {
+              "id": "laravel-debug-production",
+              "name": "laravel-debug-production",
+              "shortDescription": {
+                "text": "Laravel APP_DEBUG=true with APP_ENV=production"
+              },
+              "fullDescription": {
+                "text": "Debug pages show stack traces, environment variables and queries to anyone who triggers an error."
+              },
+              "help": {
+                "text": "Set APP_DEBUG=false in production."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-489"
+                ],
+                "security-severity": "8.0"
+              }
+            },
+            {
+              "id": "secret-aws-access-key-id",
+              "name": "secret-aws-access-key-id",
+              "shortDescription": {
+                "text": "AWS access key ID in source"
+              },
+              "fullDescription": {
+                "text": "A credential appears to be stored in the repository. Anyone with access to the code, its history, a leaked build or the browser bundle can use it."
+              },
+              "help": {
+                "text": "Revoke/rotate the credential first, then move it to environment variables or a secrets manager."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets",
+                  "CWE-798"
+                ],
+                "security-severity": "9.5"
+              }
+            },
+            {
+              "id": "secret-stripe-live-key",
+              "name": "secret-stripe-live-key",
+              "shortDescription": {
+                "text": "Stripe live secret/restricted key in source"
+              },
+              "fullDescription": {
+                "text": "A credential appears to be stored in the repository. Anyone with access to the code, its history, a leaked build or the browser bundle can use it."
+              },
+              "help": {
+                "text": "Revoke/rotate the credential first, then move it to environment variables or a secrets manager."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "secrets",
+                  "CWE-798"
+                ],
+                "security-severity": "9.5"
+              }
+            },
+            {
+              "id": "gha-script-injection",
+              "name": "gha-script-injection",
+              "shortDescription": {
+                "text": "Untrusted event data interpolated into a shell step"
+              },
+              "fullDescription": {
+                "text": "Titles, bodies and branch names are attacker-controlled; ${{ }} is substituted before the shell runs, so they can inject commands."
+              },
+              "help": {
+                "text": "Pass the value through env: and reference it as \"$VAR\"."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "ci",
+                  "CWE-78"
+                ],
+                "security-severity": "8.0"
+              }
+            },
+            {
+              "id": "js-command-injection",
+              "name": "js-command-injection",
+              "shortDescription": {
+                "text": "Shell command built from a template or concatenation"
+              },
+              "fullDescription": {
+                "text": "child_process.exec runs the string through a shell. Interpolating variables lets an attacker append extra commands with characters like ; | && or $()."
+              },
+              "help": {
+                "text": "Use execFile/spawn with an argument array and no shell, and validate inputs against an allow-list."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "code",
+                  "CWE-78"
+                ],
+                "security-severity": "8.0"
+              }
+            },
+            {
+              "id": "next-server-actions-any-origin",
+              "name": "next-server-actions-any-origin",
+              "shortDescription": {
+                "text": "Server Actions accept any origin"
+              },
+              "fullDescription": {
+                "text": "allowedOrigins with '*' disables the origin check that protects Server Actions from CSRF."
+              },
+              "help": {
+                "text": "List only your own domains."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-352"
+                ],
+                "security-severity": "8.0"
+              }
+            },
+            {
+              "id": "php-sql-injection",
+              "name": "php-sql-injection",
+              "shortDescription": {
+                "text": "SQL query built with PHP variables"
+              },
+              "fullDescription": {
+                "text": "Concatenating or interpolating variables into SQL lets attackers rewrite the query."
+              },
+              "help": {
+                "text": "Use prepared statements (PDO/mysqli) or Eloquent/Query Builder bindings."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "code",
+                  "CWE-89"
+                ],
+                "security-severity": "8.0"
+              }
+            },
+            {
+              "id": "env-file-not-ignored",
+              "name": "env-file-not-ignored",
+              "shortDescription": {
+                "text": ".env is not covered by .gitignore"
+              },
+              "fullDescription": {
+                "text": "No .gitignore rule matches this env file, so it can be committed by accident."
+              },
+              "help": {
+                "text": "Add .env* to .gitignore and keep a .env.example without values."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-538"
+                ],
+                "security-severity": "5.5"
+              }
+            },
+            {
+              "id": "django-debug",
+              "name": "django-debug",
+              "shortDescription": {
+                "text": "Django DEBUG = True"
+              },
+              "fullDescription": {
+                "text": "Debug pages leak settings and code if this file is used in production."
+              },
+              "help": {
+                "text": "Read DEBUG from the environment and default to False."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-16"
+                ],
+                "security-severity": "5.5"
+              }
+            },
+            {
+              "id": "django-allowed-hosts-any",
+              "name": "django-allowed-hosts-any",
+              "shortDescription": {
+                "text": "ALLOWED_HOSTS = ['*']"
+              },
+              "fullDescription": {
+                "text": "Any Host header is accepted, enabling host-header poisoning of password-reset links."
+              },
+              "help": {
+                "text": "List your real domains."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-16"
+                ],
+                "security-severity": "5.5"
+              }
+            },
+            {
+              "id": "compose-db-port-exposed",
+              "name": "compose-db-port-exposed",
+              "shortDescription": {
+                "text": "Database port published on all interfaces"
+              },
+              "fullDescription": {
+                "text": "The database is reachable from outside the host if the firewall allows it."
+              },
+              "help": {
+                "text": "Remove the ports mapping or bind it to 127.0.0.1."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "docker",
+                  "CWE-250"
+                ],
+                "security-severity": "5.5"
+              }
+            },
+            {
+              "id": "docker-root-user",
+              "name": "docker-root-user",
+              "shortDescription": {
+                "text": "Container runs as root"
+              },
+              "fullDescription": {
+                "text": "If the app is compromised, the attacker is root inside the container, which makes escapes and lateral movement easier."
+              },
+              "help": {
+                "text": "Add a non-root USER in the final stage."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "docker",
+                  "CWE-250"
+                ],
+                "security-severity": "5.5"
+              }
+            },
+            {
+              "id": "express-no-helmet",
+              "name": "express-no-helmet",
+              "shortDescription": {
+                "text": "Express app without helmet"
+              },
+              "fullDescription": {
+                "text": "helmet sets sensible security headers (CSP, HSTS, noSniff, frameguard) in one line."
+              },
+              "help": {
+                "text": "npm install helmet and app.use(helmet())."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-693"
+                ],
+                "security-severity": "3.0"
+              }
+            },
+            {
+              "id": "next-missing-security-headers",
+              "name": "next-missing-security-headers",
+              "shortDescription": {
+                "text": "No security headers configured for Next.js"
+              },
+              "fullDescription": {
+                "text": "No Content-Security-Policy, HSTS or frame protection was found in next.config, vercel.json or middleware. Headers limit the impact of XSS and clickjacking."
+              },
+              "help": {
+                "text": "Add headers() in next.config with CSP, HSTS, X-Content-Type-Options, Referrer-Policy and frame-ancestors."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config",
+                  "CWE-693"
+                ],
+                "security-severity": "3.0"
+              }
+            },
+            {
+              "id": "next-powered-by",
+              "name": "next-powered-by",
+              "shortDescription": {
+                "text": "X-Powered-By header not disabled"
+              },
+              "fullDescription": {
+                "text": "Next.js announces itself in X-Powered-By. It does not create a vulnerability but helps fingerprinting."
+              },
+              "help": {
+                "text": "Set poweredByHeader: false."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "config"
+                ],
+                "security-severity": "1.0"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "runtime-php2shell-2026-10",
+          "level": "error",
+          "message": {
+            "text": "[Confirmed] PHP core remote code execution (PHP2Shell). Upgrade PHP to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or a distro package that backports the fix)."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "131cd3e8db48a144"
+          },
+          "properties": {
+            "status": "confirmed",
+            "severity": "critical"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "firebase-open-rules",
+          "level": "error",
+          "message": {
+            "text": "[Confirmed] Firebase rules allow public access. Require request.auth and check ownership in the rules."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "318a08e89e096ecd"
+          },
+          "properties": {
+            "status": "confirmed",
+            "severity": "critical"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "firestore.rules"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dep-nextjs-2026-10-14",
+          "level": "error",
+          "message": {
+            "text": "[Confirmed] next 16.3.0: Next.js unauthenticated RCE (use cache typed arrays, Image Optimization SVG) and Server Actions DoS. npm install next@16.4.1 (16.x) or next@15.5.28 (15.x)."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "3d4ff35107343a03"
+          },
+          "properties": {
+            "status": "confirmed",
+            "severity": "critical"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "package-lock.json"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "laravel-debug-production",
+          "level": "error",
+          "message": {
+            "text": "[Confirmed] Laravel APP_DEBUG=true with APP_ENV=production. Set APP_DEBUG=false in production."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "44dfdf56fd0c71f5"
+          },
+          "properties": {
+            "status": "confirmed",
+            "severity": "high"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".env"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "secret-aws-access-key-id",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] AWS access key ID in source. Revoke/rotate the credential first, then move it to environment variables or a secrets manager."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "c2c03a7cbed79839"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "critical"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/config.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "secret-stripe-live-key",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] Stripe live secret/restricted key in source. Revoke/rotate the credential first, then move it to environment variables or a secrets manager."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "5a4f22fe2d591951"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "critical"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/config.ts"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "gha-script-injection",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] Untrusted event data interpolated into a shell step. Pass the value through env: and reference it as \"$VAR\"."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "37e2169d09ba5777"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "high"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/triage.yml"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "js-command-injection",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] Shell command built from a template or concatenation. Use execFile/spawn with an argument array and no shell, and validate inputs against an allow-list."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "935fb279b019e2dc"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "high"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/api/run/route.ts"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "next-server-actions-any-origin",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] Server Actions accept any origin. List only your own domains."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "6370b81c3b459047"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "high"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "next.config.js"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "php-sql-injection",
+          "level": "error",
+          "message": {
+            "text": "[Needs review] SQL query built with PHP variables. Use prepared statements (PDO/mysqli) or Eloquent/Query Builder bindings."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "1e9349a937f945cc"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "high"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "public/legacy/user.php"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "env-file-not-ignored",
+          "level": "warning",
+          "message": {
+            "text": "[Needs review] .env is not covered by .gitignore. Add .env* to .gitignore and keep a .env.example without values."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "3fc808ba65454632"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "medium"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".env"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "django-debug",
+          "level": "warning",
+          "message": {
+            "text": "[Needs review] Django DEBUG = True. Read DEBUG from the environment and default to False."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "be066ef17362773f"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "medium"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/settings.py"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "django-allowed-hosts-any",
+          "level": "warning",
+          "message": {
+            "text": "[Needs review] ALLOWED_HOSTS = ['*']. List your real domains."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "ffd160cd73b24795"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "medium"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/settings.py"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "compose-db-port-exposed",
+          "level": "warning",
+          "message": {
+            "text": "[Needs review] Database port published on all interfaces. Remove the ports mapping or bind it to 127.0.0.1."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "551ab200b7d366cd"
+          },
+          "properties": {
+            "status": "suspected",
+            "severity": "medium"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docker-compose.yml"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "docker-root-user",
+          "level": "note",
+          "message": {
+            "text": "[Preventive] Container runs as root. Add a non-root USER in the final stage."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "7524dc6703e5723e"
+          },
+          "properties": {
+            "status": "preventive",
+            "severity": "medium"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "express-no-helmet",
+          "level": "note",
+          "message": {
+            "text": "[Preventive] Express app without helmet. npm install helmet and app.use(helmet())."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "4455609c33ab6728"
+          },
+          "properties": {
+            "status": "preventive",
+            "severity": "low"
+          }
+        },
+        {
+          "ruleId": "next-missing-security-headers",
+          "level": "note",
+          "message": {
+            "text": "[Preventive] No security headers configured for Next.js. Add headers() in next.config with CSP, HSTS, X-Content-Type-Options, Referrer-Policy and frame-ancestors."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "316c5fe96b0abf7c"
+          },
+          "properties": {
+            "status": "preventive",
+            "severity": "low"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "next.config.js"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "next-powered-by",
+          "level": "note",
+          "message": {
+            "text": "[Preventive] X-Powered-By header not disabled. Set poweredByHeader: false."
+          },
+          "partialFingerprints": {
+            "nfaudit/v1": "c5a903486d08153e"
+          },
+          "properties": {
+            "status": "preventive",
+            "severity": "info"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "next.config.js"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,501 @@
+{
+  "tool": "notfound-security-audit",
+  "version": "0.1.0",
+  "generated_at": "2026-10-27 16:10 UTC",
+  "target": "demo-vulnerable-app",
+  "checks": [
+    "stack",
+    "secrets",
+    "code-patterns",
+    "config",
+    "docker",
+    "ci",
+    "runtimes",
+    "dependencies-offline"
+  ],
+  "stack": {
+    "languages": [
+      "js",
+      "py",
+      "php"
+    ],
+    "file_counts": {
+      "js": 3,
+      "py": 1,
+      "php": 1
+    },
+    "frameworks": [
+      "Express",
+      "Next.js",
+      "React"
+    ],
+    "platforms": [
+      "Docker",
+      "Docker Compose",
+      "Firebase",
+      "GitHub Actions"
+    ],
+    "manifests": [
+      "package.json"
+    ]
+  },
+  "files_scanned": 12,
+  "dependency_count": 2,
+  "lockfiles": [
+    "package-lock.json"
+  ],
+  "runtimes": [
+    {
+      "runtime": "php",
+      "version": "8.3.20",
+      "exact": true,
+      "file": "Dockerfile",
+      "line": 1
+    }
+  ],
+  "summary": {
+    "total": 18,
+    "by_status": {
+      "confirmed": 4,
+      "suspected": 10,
+      "preventive": 4
+    },
+    "by_severity": {
+      "critical": 5,
+      "high": 5,
+      "medium": 5,
+      "low": 2,
+      "info": 1
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "runtime-php2shell-2026-10",
+      "title": "PHP core remote code execution (PHP2Shell)",
+      "severity": "critical",
+      "status": "confirmed",
+      "category": "runtime",
+      "description": "Memory-handling flaws in the PHP runtime. On Apache with mod_php an unauthenticated request could trigger code execution before application code ran; PHP-FPM was also confirmed exploitable through application code paths. Fixing application code or plugins does not fix it: the PHP binary must be updated.",
+      "recommendation": "Upgrade PHP to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or a distro package that backports the fix).",
+      "file": "Dockerfile",
+      "line": 1,
+      "evidence": "php 8.3.20",
+      "cwe": "",
+      "owasp": "",
+      "remediation": [
+        "Upgrade PHP to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or a distro package that backports the fix).",
+        "Rebuild and redeploy Docker images (docker build --pull).",
+        "PHP 8.1 and older have no regular upstream fix: plan the upgrade.",
+        "A WAF rule is defense in depth, not a fix."
+      ],
+      "references": [
+        "https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/",
+        "https://blog.cloudflare.com/php-vulnerabilities-waf-protection/"
+      ],
+      "source": "nfaudit",
+      "extra": {
+        "aliases": [
+          "CVE-2026-109618",
+          "CVE-2026-109619"
+        ],
+        "fixed": "8.3.36",
+        "end_of_life": false
+      },
+      "fingerprint": "131cd3e8db48a144"
+    },
+    {
+      "rule_id": "firebase-open-rules",
+      "title": "Firebase rules allow public access",
+      "severity": "critical",
+      "status": "confirmed",
+      "category": "external-services",
+      "description": "Anyone with your public Firebase config can read or write this data.",
+      "recommendation": "Require request.auth and check ownership in the rules.",
+      "file": "firestore.rules",
+      "line": 4,
+      "evidence": "allow read, write: if true;",
+      "cwe": "CWE-284",
+      "owasp": "A01:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "318a08e89e096ecd"
+    },
+    {
+      "rule_id": "dep-nextjs-2026-10-14",
+      "title": "next 16.3.0: Next.js unauthenticated RCE (use cache typed arrays, Image Optimization SVG) and Server Actions DoS",
+      "severity": "critical",
+      "status": "confirmed",
+      "category": "dependency",
+      "description": "Two critical unauthenticated remote code execution issues (App Router 'use cache' functions returning typed arrays; Image Optimization API with SVG on glibc Linux) and a high-severity Server Actions denial of service.",
+      "recommendation": "npm install next@16.4.1 (16.x) or next@15.5.28 (15.x).",
+      "file": "package-lock.json",
+      "line": 0,
+      "evidence": "next@16.3.0",
+      "cwe": "CWE-1395",
+      "owasp": "A03:2025",
+      "remediation": [
+        "npm install next@16.4.1 (16.x) or next@15.5.28 (15.x).",
+        "Make sure the resolved sharp version is 0.35.5 or later.",
+        "Redeploy after upgrading."
+      ],
+      "references": [
+        "https://nextjs.org/blog/nextjs-security-update-october-14-2026"
+      ],
+      "source": "nfaudit",
+      "extra": {
+        "aliases": [
+          "GHSA-673q-mjm6-r5xr",
+          "CVE-2026-96889",
+          "GHSA-2464-fhr4-w9xw",
+          "GHSA-p3m5-59mp-jv5r"
+        ],
+        "fixed": "16.4.1",
+        "package": "next",
+        "version": "16.3.0"
+      },
+      "fingerprint": "3d4ff35107343a03"
+    },
+    {
+      "rule_id": "laravel-debug-production",
+      "title": "Laravel APP_DEBUG=true with APP_ENV=production",
+      "severity": "high",
+      "status": "confirmed",
+      "category": "config",
+      "description": "Debug pages show stack traces, environment variables and queries to anyone who triggers an error.",
+      "recommendation": "Set APP_DEBUG=false in production.",
+      "file": ".env",
+      "line": 2,
+      "evidence": "APP_DEBUG=true",
+      "cwe": "CWE-489",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "44dfdf56fd0c71f5"
+    },
+    {
+      "rule_id": "secret-aws-access-key-id",
+      "title": "AWS access key ID in source",
+      "severity": "critical",
+      "status": "suspected",
+      "category": "secrets",
+      "description": "A credential appears to be stored in the repository. Anyone with access to the code, its history, a leaked build or the browser bundle can use it.",
+      "recommendation": "Revoke/rotate the credential first, then move it to environment variables or a secrets manager.",
+      "file": "lib/config.ts",
+      "line": 1,
+      "evidence": "export const aws = 'AKIA…****** (20 chars)'",
+      "cwe": "CWE-798",
+      "owasp": "A07:2025",
+      "remediation": [
+        "Rotate the key in the provider dashboard (assume it is compromised).",
+        "Load it from an environment variable / secrets manager.",
+        "Remove it from git history (git filter-repo) if the repository was ever shared.",
+        "Add a pre-commit secret scanner."
+      ],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {
+        "in_tests": false
+      },
+      "fingerprint": "c2c03a7cbed79839"
+    },
+    {
+      "rule_id": "secret-stripe-live-key",
+      "title": "Stripe live secret/restricted key in source",
+      "severity": "critical",
+      "status": "suspected",
+      "category": "secrets",
+      "description": "A credential appears to be stored in the repository. Anyone with access to the code, its history, a leaked build or the browser bundle can use it.",
+      "recommendation": "Revoke/rotate the credential first, then move it to environment variables or a secrets manager.",
+      "file": "lib/config.ts",
+      "line": 2,
+      "evidence": "export const stripe = \"sk_l…****** (34 chars)\"",
+      "cwe": "CWE-798",
+      "owasp": "A07:2025",
+      "remediation": [
+        "Rotate the key in the provider dashboard (assume it is compromised).",
+        "Load it from an environment variable / secrets manager.",
+        "Remove it from git history (git filter-repo) if the repository was ever shared.",
+        "Add a pre-commit secret scanner."
+      ],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {
+        "in_tests": false
+      },
+      "fingerprint": "5a4f22fe2d591951"
+    },
+    {
+      "rule_id": "gha-script-injection",
+      "title": "Untrusted event data interpolated into a shell step",
+      "severity": "high",
+      "status": "suspected",
+      "category": "ci",
+      "description": "Titles, bodies and branch names are attacker-controlled; ${{ }} is substituted before the shell runs, so they can inject commands.",
+      "recommendation": "Pass the value through env: and reference it as \"$VAR\".",
+      "file": ".github/workflows/triage.yml",
+      "line": 7,
+      "evidence": "echo \"${{ github.event.issue.title }}\"",
+      "cwe": "CWE-78",
+      "owasp": "A05:2025",
+      "remediation": [],
+      "references": [
+        "https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions"
+      ],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "37e2169d09ba5777"
+    },
+    {
+      "rule_id": "js-command-injection",
+      "title": "Shell command built from a template or concatenation",
+      "severity": "high",
+      "status": "suspected",
+      "category": "code",
+      "description": "child_process.exec runs the string through a shell. Interpolating variables lets an attacker append extra commands with characters like ; | && or $().",
+      "recommendation": "Use execFile/spawn with an argument array and no shell, and validate inputs against an allow-list.",
+      "file": "app/api/run/route.ts",
+      "line": 4,
+      "evidence": "exec(`ls ${dir}`)",
+      "cwe": "CWE-78",
+      "owasp": "A05:2025",
+      "remediation": [
+        "Switch to execFile(cmd, [arg1, arg2]) or spawn(cmd, args, { shell: false }).",
+        "Validate every argument with an allow-list (e.g. /^[a-z0-9-]+$/).",
+        "Never pass request data straight to a shell."
+      ],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {
+        "in_tests": false
+      },
+      "fingerprint": "935fb279b019e2dc"
+    },
+    {
+      "rule_id": "next-server-actions-any-origin",
+      "title": "Server Actions accept any origin",
+      "severity": "high",
+      "status": "suspected",
+      "category": "config",
+      "description": "allowedOrigins with '*' disables the origin check that protects Server Actions from CSRF.",
+      "recommendation": "List only your own domains.",
+      "file": "next.config.js",
+      "line": 1,
+      "evidence": "module.exports = { experimental: { serverActions: { allowedOrigins: ['*'] } } }",
+      "cwe": "CWE-352",
+      "owasp": "A01:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "6370b81c3b459047"
+    },
+    {
+      "rule_id": "php-sql-injection",
+      "title": "SQL query built with PHP variables",
+      "severity": "high",
+      "status": "suspected",
+      "category": "code",
+      "description": "Concatenating or interpolating variables into SQL lets attackers rewrite the query.",
+      "recommendation": "Use prepared statements (PDO/mysqli) or Eloquent/Query Builder bindings.",
+      "file": "public/legacy/user.php",
+      "line": 3,
+      "evidence": "$r = mysqli_query($db, \"SELECT * FROM users WHERE id = \" . $_GET['id']);",
+      "cwe": "CWE-89",
+      "owasp": "A05:2025",
+      "remediation": [
+        "$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?'); $stmt->execute([$id]);",
+        "In Laravel: DB::select('... where id = ?', [$id]) or ->whereRaw('id = ?', [$id]).",
+        "Cast numeric inputs with (int)."
+      ],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {
+        "in_tests": false
+      },
+      "fingerprint": "1e9349a937f945cc"
+    },
+    {
+      "rule_id": "env-file-not-ignored",
+      "title": ".env is not covered by .gitignore",
+      "severity": "medium",
+      "status": "suspected",
+      "category": "config",
+      "description": "No .gitignore rule matches this env file, so it can be committed by accident.",
+      "recommendation": "Add .env* to .gitignore and keep a .env.example without values.",
+      "file": ".env",
+      "line": 0,
+      "evidence": "",
+      "cwe": "CWE-538",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "3fc808ba65454632"
+    },
+    {
+      "rule_id": "django-debug",
+      "title": "Django DEBUG = True",
+      "severity": "medium",
+      "status": "suspected",
+      "category": "config",
+      "description": "Debug pages leak settings and code if this file is used in production.",
+      "recommendation": "Read DEBUG from the environment and default to False.",
+      "file": "backend/settings.py",
+      "line": 1,
+      "evidence": "DEBUG = True",
+      "cwe": "CWE-16",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "be066ef17362773f"
+    },
+    {
+      "rule_id": "django-allowed-hosts-any",
+      "title": "ALLOWED_HOSTS = ['*']",
+      "severity": "medium",
+      "status": "suspected",
+      "category": "config",
+      "description": "Any Host header is accepted, enabling host-header poisoning of password-reset links.",
+      "recommendation": "List your real domains.",
+      "file": "backend/settings.py",
+      "line": 2,
+      "evidence": "ALLOWED_HOSTS = ['*']",
+      "cwe": "CWE-16",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "ffd160cd73b24795"
+    },
+    {
+      "rule_id": "compose-db-port-exposed",
+      "title": "Database port published on all interfaces",
+      "severity": "medium",
+      "status": "suspected",
+      "category": "docker",
+      "description": "The database is reachable from outside the host if the firewall allows it.",
+      "recommendation": "Remove the ports mapping or bind it to 127.0.0.1.",
+      "file": "docker-compose.yml",
+      "line": 5,
+      "evidence": "- \"5432:5432\"",
+      "cwe": "CWE-250",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "551ab200b7d366cd"
+    },
+    {
+      "rule_id": "docker-root-user",
+      "title": "Container runs as root",
+      "severity": "medium",
+      "status": "preventive",
+      "category": "docker",
+      "description": "If the app is compromised, the attacker is root inside the container, which makes escapes and lateral movement easier.",
+      "recommendation": "Add a non-root USER in the final stage.",
+      "file": "Dockerfile",
+      "line": 0,
+      "evidence": "",
+      "cwe": "CWE-250",
+      "owasp": "A02:2025",
+      "remediation": [
+        "RUN adduser -D app (or useradd) and USER app",
+        "Official node images ship a 'node' user: USER node"
+      ],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "7524dc6703e5723e"
+    },
+    {
+      "rule_id": "express-no-helmet",
+      "title": "Express app without helmet",
+      "severity": "low",
+      "status": "preventive",
+      "category": "config",
+      "description": "helmet sets sensible security headers (CSP, HSTS, noSniff, frameguard) in one line.",
+      "recommendation": "npm install helmet and app.use(helmet()).",
+      "file": "",
+      "line": 0,
+      "evidence": "",
+      "cwe": "CWE-693",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "4455609c33ab6728"
+    },
+    {
+      "rule_id": "next-missing-security-headers",
+      "title": "No security headers configured for Next.js",
+      "severity": "low",
+      "status": "preventive",
+      "category": "config",
+      "description": "No Content-Security-Policy, HSTS or frame protection was found in next.config, vercel.json or middleware. Headers limit the impact of XSS and clickjacking.",
+      "recommendation": "Add headers() in next.config with CSP, HSTS, X-Content-Type-Options, Referrer-Policy and frame-ancestors.",
+      "file": "next.config.js",
+      "line": 0,
+      "evidence": "",
+      "cwe": "CWE-693",
+      "owasp": "A02:2025",
+      "remediation": [
+        "async headers() { return [{ source: '/(.*)', headers: [...] }] }",
+        "Verify on the live site with: nfaudit headers https://your-site"
+      ],
+      "references": [
+        "https://nextjs.org/docs/app/api-reference/config/next-config-js/headers"
+      ],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "316c5fe96b0abf7c"
+    },
+    {
+      "rule_id": "next-powered-by",
+      "title": "X-Powered-By header not disabled",
+      "severity": "info",
+      "status": "preventive",
+      "category": "config",
+      "description": "Next.js announces itself in X-Powered-By. It does not create a vulnerability but helps fingerprinting.",
+      "recommendation": "Set poweredByHeader: false.",
+      "file": "next.config.js",
+      "line": 0,
+      "evidence": "",
+      "cwe": "",
+      "owasp": "A02:2025",
+      "remediation": [],
+      "references": [],
+      "source": "nfaudit",
+      "extra": {},
+      "fingerprint": "c5a903486d08153e"
+    }
+  ],
+  "entry_points": [
+    {
+      "kind": "Next.js route handler",
+      "file": "app/api/run/route.ts",
+      "line": 2,
+      "match": "export async function POST(req: Request) {"
+    },
+    {
+      "kind": "PHP entry reading request",
+      "file": "public/legacy/user.php",
+      "line": 2,
+      "match": "$id = $_GET['id'];"
+    }
+  ],
+  "notes": [
+    "Dependencies were only checked against the small built-in advisory list. Run with --osv (sends package names and versions to OSV.dev, never code) for full CVE coverage."
+  ],
+  "errors": [],
+  "ignored_count": 0
+}
